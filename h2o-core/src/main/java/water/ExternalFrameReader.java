@@ -10,7 +10,14 @@ import java.nio.channels.SocketChannel;
 import java.util.UUID;
 
 /**
- * Use to read from H2O Frames from non H2O environments
+ * This class can be used to read data from H2O Frames from non-H2O environments
+ *
+ * It is expected that the frame we want to read is already in the DKV.
+ *
+ * Example of use:
+ * SocketChannel channel = ExternalFrameHandler.getConnection("ip:port")
+ * {@code ExternalFrameReader reader = new ExternalFrameReader(channel
+ * }
  */
 public class ExternalFrameReader {
 
@@ -18,9 +25,14 @@ public class ExternalFrameReader {
     private static final byte NOT_NA = 0;
 
     // hints for expected types in order to handle download properly
-    public static final byte EXPECTED_INT = 0;
-    public static final byte EXPECTED_DOUBLE = 1;
-    public static final byte EXPECTED_STRING = 2;
+    public static final byte EXPECTED_BOOL = 0;
+    public static final byte EXPECTED_BYTE = 1;
+    public static final byte EXPECTED_INT = 2;
+    public static final byte EXPECTED_SHORT = 3;
+    public static final byte EXPECTED_LONG = 4;
+    public static final byte EXPECTED_FLOAT = 5;
+    public static final byte EXPECTED_DOUBLE = 6;
+    public static final byte EXPECTED_STRING = 7;
 
     private AutoBuffer ab;
     private String keyName;
@@ -78,6 +90,9 @@ public class ExternalFrameReader {
     }
 
     static void handleReadingFromChunk(SocketChannel sock, AutoBuffer recvAb) throws IOException {
+        // buffer string to be reused for strings to avoid multiple allocation
+        BufferedString valStr = new BufferedString();
+
         String frame_key = recvAb.getStr();
         byte[] expectedTypes = recvAb.getA1();
         assert expectedTypes != null;
@@ -102,27 +117,40 @@ public class ExternalFrameReader {
 
                     Chunk chnk = chunks[cidx];
                     switch (expectedTypes[cidx]) {
-                        case ExternalFrameReader.EXPECTED_INT:
+                        case EXPECTED_BYTE:
                             if (chnk.vec().isNumeric() || chnk.vec().isTime()) {
-                                ab.put8(chnk.at8(rowIdx));
+                                ab.put1((byte)chnk.at8(rowIdx));
                             } else {
                                 assert chnk.vec().domain() != null && chnk.vec().domain().length != 0;
                                 // in this case the chunk is categorical with integers in the domain
-                                ab.put8(Integer.parseInt(chnk.vec().domain()[(int) chnk.at8(rowIdx)]));
+                                ab.put1(Byte.parseByte(chnk.vec().domain()[(int) chnk.at8(rowIdx)]));
+                            }
+                            break;
+                        case EXPECTED_BOOL:
+                            if (chnk.vec().isNumeric() || chnk.vec().isTime()) {
+                                ab.put1((byte)chnk.at8(rowIdx));
+                            } else {
+                                assert chnk.vec().domain() != null && chnk.vec().domain().length != 0;
+                                // in this case the chunk is categorical with integers in the domain
+                                ab.put1(Byte.parseByte(chnk.vec().domain()[(int) chnk.at8(rowIdx)]));
+                            }
+                            break;
+                        case ExternalFrameReader.EXPECTED_INT:
+                            if (chnk.vec().isNumeric() || chnk.vec().isTime()) {
+                                ab.putInt((int)chnk.at8(rowIdx));
+                            } else {
+                                assert chnk.vec().domain() != null && chnk.vec().domain().length != 0;
+                                // in this case the chunk is categorical with integers in the domain
+                                ab.putInt(Integer.parseInt(chnk.vec().domain()[(int) chnk.at8(rowIdx)]));
                             }
                             break;
                         case ExternalFrameReader.EXPECTED_DOUBLE:
                             assert chnk.vec().isNumeric();
-                            if (chnk.vec().isInt()) {
-                                ab.put8(chnk.at8(rowIdx));
-                            } else {
-                                ab.put8d(chnk.atd(rowIdx));
-                            }
-
+                            ab.put8d(chnk.atd(rowIdx));
                             break;
                         case ExternalFrameReader.EXPECTED_STRING:
                             assert chnk.vec().isCategorical() || chnk.vec().isString() || chnk.vec().isUUID();
-                            ab.putStr(getStringFromChunk(chunks, cidx, rowIdx));
+                            ab.putStr(getStringFromChunk(chunks, cidx, rowIdx, valStr));
                             break;
                     }
 
@@ -144,18 +172,16 @@ public class ExternalFrameReader {
         }
     }
 
-    private static String getStringFromChunk(Chunk[] chks, int columnNum, int rowIdx) {
+    private static String getStringFromChunk(Chunk[] chks, int columnNum, int rowIdx, BufferedString valStr) {
         if (chks[columnNum].vec().isCategorical()) {
             return chks[columnNum].vec().domain()[(int) chks[columnNum].at8(rowIdx)];
         } else if (chks[columnNum].vec().isString()) {
-            BufferedString valStr = new BufferedString();
-            chks[columnNum].atStr(valStr, rowIdx); // TODO improve this.
+            chks[columnNum].atStr(valStr, rowIdx);
             return valStr.toString();
         } else if (chks[columnNum].vec().isUUID()) {
             UUID uuid = new UUID(chks[columnNum].at16h(rowIdx), chks[columnNum].at16l(rowIdx));
             return uuid.toString();
         } else {
-
             assert false : "Null can never be returned at this point";
             return null;
         }
