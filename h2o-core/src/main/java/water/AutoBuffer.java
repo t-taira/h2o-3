@@ -133,9 +133,8 @@ public final class AutoBuffer {
   /** Incoming TCP request.  Make a read-mode AutoBuffer from the open Channel,
    *  figure the originating H2ONode from the first few bytes read.
    *
-   *  Remote address means that the communication originates from non-h2o node ( for example spark executor)
-   *  Int this case we don't send H2O field ( it would cause infinite wait, since we don't send port and other
-   *  information when communicating with non-h2o node)
+   *  remoteAddress set tu null means that the communication is coming from non-h2o node, non-null value
+   *  represents the case where the communication is coming from h2o node.
    *  */
   AutoBuffer( ByteChannel sock, InetAddress remoteAddress  ) throws IOException {
     _chan = sock;
@@ -148,6 +147,12 @@ public final class AutoBuffer {
     if(remoteAddress!=null) {
       _h2o = H2ONode.intern(remoteAddress, getPort());
     }else{
+      // In case the communication originates from non-h2o node, we set _h2o node to null.
+      // It is for 2 reasons:
+      //  - H2ONode.intern creates a new thread and if there's a lot of connections
+      //    from non-h2o environment, it could end up with Too many open files exception.
+      //  - H2OIntern also reads port (getPort()) and additional information which we do not send
+      //    in communication originating from non-h2o nodes
       _h2o = null;
     }
     _firstPage = true;          // Yes, must reset this.
