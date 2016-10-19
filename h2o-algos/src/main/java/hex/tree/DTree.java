@@ -671,7 +671,7 @@ public class DTree extends Iced {
       ab.put1(_nodeType);          // Includes left-child skip-size bits
       assert _split != null;    // Not a broken root non-decision?
       assert _split._col >= 0;
-      ab.put2((short)_split._col);
+      ab.put2s((short)_split._col);
       ab.put1((byte)_split._nasplit.value());
 
       // Save split-at-value or group
@@ -685,7 +685,7 @@ public class DTree extends Iced {
       if( (_nodeType&48) == 0 ) { // Size bits are optional for left leaves !
         int sz = left.size();
         if(sz < 256)            ab.put1(       sz);
-        else if (sz < 65535)    ab.put2((short)sz);
+        else if (sz < 65535)    ab.put2s((short)sz);
         else if (sz < (1<<24))  ab.put3(       sz);
         else                    ab.put4(       sz); // 1<<31-1
       }

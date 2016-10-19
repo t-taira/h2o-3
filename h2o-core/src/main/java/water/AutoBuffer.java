@@ -722,6 +722,7 @@ public final class AutoBuffer {
   @SuppressWarnings("unused")  public byte   get1 () { return getSp(1).get      (); }
   @SuppressWarnings("unused")  public int    get1U() { return get1() & 0xFF;        }
   @SuppressWarnings("unused")  public char   get2 () { return getSp(2).getChar  (); }
+  @SuppressWarnings("unused")  public short get2s() {return  getSp(2).getShort();}
   @SuppressWarnings("unused")  public int    get3 () { getSp(3); return get1U() | get1U() << 8 | get1U() << 16; }
   @SuppressWarnings("unused")  public int    get4 () { return getSp(4).getInt   (); }
   @SuppressWarnings("unused")  public float  get4f() { return getSp(4).getFloat (); }
@@ -736,8 +737,8 @@ public final class AutoBuffer {
   @SuppressWarnings("unused")  public AutoBuffer putZ (boolean b){ return put1(b?1:0); }
   @SuppressWarnings("unused")  public AutoBuffer put1 (   int b) { assert b >= -128 && b <= 255 : ""+b+" is not a byte";
                                                             putSp(1).put((byte)b); return this; }
-  @SuppressWarnings("unused")  public AutoBuffer put2 (  char c) { putSp(2).putChar  (c); return this; }
-  @SuppressWarnings("unused")  public AutoBuffer put2 ( short s) { putSp(2).putShort (s); return this; }
+  @SuppressWarnings("unused")  public AutoBuffer put2 ( char s) { putSp(2).putChar (s); return this; }
+  @SuppressWarnings("unused")  public AutoBuffer put2s(  short c) { putSp(2).putShort  (c); return this; }
   @SuppressWarnings("unused")  public AutoBuffer put3( int x ) {   assert (-1<<24) <= x && x < (1<<24);
                                                             return put1((x)&0xFF).put1((x >> 8)&0xFF).put1(x >> 16); }
   @SuppressWarnings("unused")  public AutoBuffer put4 (   int i) { putSp(4).putInt   (i); return this; }
@@ -790,7 +791,7 @@ public final class AutoBuffer {
   // is null" flag when passing the array length).
   public AutoBuffer putInt(int x) {
     if( 0 <= (x+1)&& (x+1) <= 253 ) return put1(x+1);
-    if( Short.MIN_VALUE <= x && x <= Short.MAX_VALUE ) return put1(255).put2((short)x);
+    if( Short.MIN_VALUE <= x && x <= Short.MAX_VALUE ) return put1(255).put2s((short)x);
     return put1(254).put4(x);
   }
   // Get a (compressed) integer.  See above for the compression strategy and reasoning.
@@ -1308,7 +1309,7 @@ public final class AutoBuffer {
       return this;
     }
     if( Short.MIN_VALUE <= min && max < Short.MAX_VALUE ) { // Ship as shorts
-      put1(2);  for( int i=x; i<y; i++ ) put2((short)ary[i]);
+      put1(2);  for( int i=x; i<y; i++ ) put2s((short)ary[i]);
       return this;
     }
     if( Integer.MIN_VALUE <= min && max < Integer.MAX_VALUE ) { // Ship as ints

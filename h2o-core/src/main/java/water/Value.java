@@ -343,14 +343,14 @@ public final class Value extends Iced implements ForkJoinPool.ManagedBlocker {
   // and the normal serializer then might ship over a null instead of the
   // intended byte[].  Also, the value is NOT on the deserialize'd machines disk
   public final AutoBuffer write_impl( AutoBuffer ab ) {
-    return ab.put1(_persist).put2(_type).putA1(memOrLoad());
+    return ab.put1(_persist).put2s(_type).putA1(memOrLoad());
   }
   // Custom serializer: set _max from _mem length; set replicas & timestamp.
   public final Value read_impl(AutoBuffer bb) {
     assert _key == null;        // Not set yet
     // Set persistence backend but... strip off saved-to-disk bit
     _persist = (byte)(bb.get1()&BACKEND_MASK);
-    _type = (short) bb.get2();
+    _type = bb.get2s();
     _mem = bb.getA1();
     _max = _mem.length;
     assert _max < MAX : "Value size=0x"+Integer.toHexString(_max)+" during read is larger than "+Integer.toHexString(MAX)+", type: "+TypeMap.className(_type);
