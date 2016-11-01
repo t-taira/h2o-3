@@ -949,7 +949,7 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
       _model._output._training_metrics = mtrain;
       long t2 = System.currentTimeMillis();
       Log.info(LogMsg("Training metrics computed in " + (t2-t1) + "ms"));
-      Log.info(LogMsg(mtrain.toString()));
+      Log.info(LogMsg("ModelMetrics: " + mtrain));
       if(_valid != null) {
         Frame valid = DKV.<Frame>getGet(_parms._valid);
         _model.score(valid).delete();
