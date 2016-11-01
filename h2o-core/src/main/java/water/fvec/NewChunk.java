@@ -646,18 +646,25 @@ public class NewChunk extends Chunk {
     else addUUID(uuid.getLeastSignificantBits(), uuid.getMostSignificantBits());
   }
 
+  public void checkUUID(long lo, long hi) {
+    if (C16Chunk.isNA(lo, hi)) throw new IllegalArgumentException("Cannot set illegal UUID value");
+  }
+  
   // Append a UUID, stored in _ls & _ds
   public void addUUID( long lo, long hi ) {
+    checkUUID(lo, hi);
+    if( _ms==null || _ds== null || _sparseLen >= _ms.len() )
+      append2slowUUID();
+
     set_impl(_sparseLen, lo, hi);
     _sparseLen++;
     _len++;
+
     assert _sparseLen <= _len;
   }
 
   @Override public boolean set_impl(int idx, long lo, long hi) {
-    if (C16Chunk.isNA(lo, hi)) throw new IllegalArgumentException("Cannot set illegal UUID value");
-    if( _ms==null || _ds== null || idx >= _ms.len() )
-      append2slowUUID();
+    checkUUID(lo, hi);
     _ms.set(idx,lo);
     _ds[idx] = Double.longBitsToDouble(hi);
     return true;
@@ -1542,7 +1549,7 @@ public class NewChunk extends Chunk {
       if(idx >= 0)i = idx;
       else cancel_sparse(); // for now don't bother setting the sparse value
     }
-    if (_is != null) _is[i] = _sslen;
+    _is[i] = _sslen;
     append_ss(str);
     return true;
   }

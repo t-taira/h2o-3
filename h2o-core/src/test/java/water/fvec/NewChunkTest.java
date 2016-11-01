@@ -596,6 +596,7 @@ public class NewChunkTest extends TestUtil {
     assertTrue(nc.isNA(1));
     nc.set_impl(0, 42L, Long.MIN_VALUE);
     nc.set_impl(1, 43L, Long.MAX_VALUE);
+    assertEquals(2, nc.len());
     assertEquals(42L, nc.at16l_impl(0));
     assertEquals(Long.MIN_VALUE, nc.at16h_impl(0));
     assertEquals(43L, nc.at16l_impl(1));
