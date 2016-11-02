@@ -658,10 +658,13 @@ public class TestUtil extends Iced {
   @BeforeClass
   public static void hi() {
     stall_till_cloudsize(1);
-    Scope.enter();
   }
 
-  @AfterClass public static void bye() { Scope.exit(); }
+  @Before public void enterScope() {
+    Scope.enter();
+  }
+  
+  @After public void bye() { Scope.exit(); }
 
   protected static Vec willDrop(Vec v) { return Scope.track(v); }
 }
