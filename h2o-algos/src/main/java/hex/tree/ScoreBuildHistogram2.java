@@ -284,8 +284,7 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
             if(_shareHisto) {
               lh.resizeIfNeeded(h._w.length);
               h.updateSharedHistosAndReset(lh,ws,cs,ys,rs,nh[n], n == 0 ? 0 : nh[n - 1]);
-            }
-            else h.updateHisto(ws,cs,ys,rs,nh[n], n == 0 ? 0 : nh[n - 1]);
+            } else h.updateHisto(ws,cs,ys,rs,nh[n], n == 0 ? 0 : nh[n - 1]);
           }
         }
       }

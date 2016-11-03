@@ -470,19 +470,19 @@ public abstract class SharedTree<M extends SharedTreeModel<M,P,O>, P extends Sha
     }
     @Override public void onCompletion(CountedCompleter caller) {
       ScoreBuildHistogram sbh = (ScoreBuildHistogram)caller;
-      for(int i = 0; i < sbh._hcs.length; ++i)
-          for(int j = 0; j < sbh._hcs[i].length;++j) {
-            System.out.println();
-            System.out.println(i + ", " + j);
-            DHistogram d = sbh._hcs[i][j];
-            if (d == null) {
-              System.out.println("null");
-            } else {
-              System.out.println("w: " + Arrays.toString(d._w));
-              System.out.println("wY: " + Arrays.toString(d._wY));
-              System.out.println("wYY: " + Arrays.toString(d._wYY));
-            }
-          }
+//      for(int i = 0; i < sbh._hcs.length; ++i)
+//          for(int j = 0; j < sbh._hcs[i].length;++j) {
+//            System.out.println();
+//            System.out.println(i + ", " + j);
+//            DHistogram d = sbh._hcs[i][j];
+//            if (d == null) {
+//              System.out.println("null");
+//            } else {
+//              System.out.println("w: " + Arrays.toString(d._w));
+//              System.out.println("wY: " + Arrays.toString(d._wY));
+//              System.out.println("wYY: " + Arrays.toString(d._wYY));
+//            }
+//          }
       //System.out.println(sbh.profString());
       final int leafOffset = _leafOffsets[_k];
       int tmax = _tree.len();   // Number of total splits in tree K

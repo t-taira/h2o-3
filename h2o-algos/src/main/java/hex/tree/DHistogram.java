@@ -635,6 +635,10 @@ public final class DHistogram extends Iced {
         _wYY[b] += wyy;
       }
     }
+    for(int i = 0; i < _wY.length; ++i){
+      _wY[i] = (float)_wY[i];
+      _wYY[i] = (float)_wYY[i];
+    }
     double d;
     if( (d = minmax[0]) < _min2 )  _min2  = d;
     if( (d = minmax[1]) > _maxIn)  _maxIn = d;
