@@ -32,9 +32,9 @@ import water.util.VecUtils;
  * the histos in this can be shared or deep cloned. The idea is that since we're parallelizing over the columns, there is gonna be fewer threads working over the rows and less collisions (or lower memory overhead of deep cloned histos).
  */
 public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
-  int [] _cids;
-  int [][] _nhs;
-  int [][] _rss;
+  transient int []   _cids;
+  transient int [][] _nhs;
+  transient int [][] _rss;
   Frame _fr2;
   public ScoreBuildHistogram2(H2O.H2OCountedCompleter cc, int k, int ncols, int nbins, int nbins_cats, DTree tree, int leaf, DHistogram[][] hcs, DistributionFamily family, int weightIdx, int workIdx, int nidIdx) {
     super(cc, k, ncols, nbins, nbins_cats, tree, leaf, hcs, family, weightIdx, workIdx, nidIdx);
@@ -113,7 +113,7 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
       int sz = (int)(espc[i] - espc[i-1]);
       if(sz > largestChunkSz) largestChunkSz = sz;
     }
-    int ncols = _fr2.numCols() - 1 - (_weightIdx == -1?0:1);
+    int ncols = _ncols;
     int colBlockSz= Math.min(10,ncols);
     while(0 < ncols - colBlockSz && ncols % colBlockSz < (colBlockSz >> 1))
       colBlockSz++;
@@ -123,9 +123,9 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
 
     final int nthreads = nrowThreads;
     ArrayList<ForkJoinTask> tsks = new ArrayList<>();
-    for(int i = 0; i < ncols; i+= colBlockSz){
+    for(int i = 0; i < ncols; i += colBlockSz){
       final int colFrom= i;
-      final int colTo= Math.min(_fr2.numCols()-3,colFrom+colBlockSz);
+      final int colTo = Math.min(ncols,colFrom+colBlockSz);
       DHistogram[][] hcs = _hcs.clone();
       for(int j = 0; j < hcs.length; ++j)
         hcs[j] = Arrays.copyOfRange(hcs[j],colFrom,colTo);

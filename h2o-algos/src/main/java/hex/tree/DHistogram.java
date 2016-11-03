@@ -48,7 +48,8 @@ public final class DHistogram extends Iced {
   public double _step;     // Linear interpolation step per bin
   public final double _min, _maxEx; // Conservative Min/Max over whole collection.  _maxEx is Exclusive.
   public double _w[];           // weighted count of observations per bin, shared, atomically incremented
-  private double _wY[], _wYY[]; // weighted response per bin and weighted squared response per bin, shared, atomically incremented
+  protected double[] _wY;
+  protected double[] _wYY; // weighted response per bin and weighted squared response per bin, shared, atomically incremented
   private AtomicDouble _wNA, _wYNA, _wYYNA; // same for missing observations
 
   // Atomically updated double min/max
