@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
 import water.fvec.Vec;
+import water.util.Log;
 import water.util.VecUtils;
 
 /**
@@ -36,8 +37,18 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
   transient int [][] _nhs;
   transient int [][] _rss;
   Frame _fr2;
-  public ScoreBuildHistogram2(H2O.H2OCountedCompleter cc, int k, int ncols, int nbins, int nbins_cats, DTree tree, int leaf, DHistogram[][] hcs, DistributionFamily family, int weightIdx, int workIdx, int nidIdx) {
+
+
+  public static class SCBParms extends Iced{
+    public int blockSz;
+    public boolean sharedHisto;
+    public int min_threads;
+  }
+  SCBParms _parms;
+
+  public ScoreBuildHistogram2(H2O.H2OCountedCompleter cc, int k, int ncols, int nbins, int nbins_cats, DTree tree, int leaf, DHistogram[][] hcs, DistributionFamily family, int weightIdx, int workIdx, int nidIdx, SCBParms parms) {
     super(cc, k, ncols, nbins, nbins_cats, tree, leaf, hcs, family, weightIdx, workIdx, nidIdx);
+    _parms = parms;
   }
 
   @Override
@@ -114,13 +125,13 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
       if(sz > largestChunkSz) largestChunkSz = sz;
     }
     int ncols = _ncols;
-    int colBlockSz= Math.min(10,ncols);
+    int colBlockSz= Math.min(ncols,_parms.blockSz);
     while(0 < ncols - colBlockSz && ncols % colBlockSz < (colBlockSz >> 1))
       colBlockSz++;
     int nrowThreads = 1;
     int ncolBlocks = ncols/colBlockSz;
-    while(ncolBlocks*nrowThreads < ncores)nrowThreads++;
-
+    while(ncolBlocks*nrowThreads < _parms.min_threads)nrowThreads++;
+    Log.info("column block sz = " + colBlockSz + ", nthreads per block = " + nrowThreads + ", shared histo = " + _parms.sharedHisto);
     final int nthreads = nrowThreads;
     ArrayList<ForkJoinTask> tsks = new ArrayList<>();
     for(int i = 0; i < ncols; i += colBlockSz){
@@ -129,7 +140,7 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
       DHistogram[][] hcs = _hcs.clone();
       for(int j = 0; j < hcs.length; ++j)
         hcs[j] = Arrays.copyOfRange(hcs[j],colFrom,colTo);
-      tsks.add(new LocalMR<ComputeHistoThread>(new ComputeHistoThread(hcs,colFrom,colTo,largestChunkSz),priority(),nthreads));
+      tsks.add(new LocalMR<ComputeHistoThread>(new ComputeHistoThread(hcs,colFrom,colTo,largestChunkSz,_parms.sharedHisto),priority(),nthreads));
     }
     ForkJoinTask.invokeAll(tsks);
   }
@@ -223,8 +234,9 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
     double [] ws = null;
     double [] ys = null;
 
-    ComputeHistoThread(DHistogram [][] hcs, int colFrom, int colTo, int maxChunkSz){
+    ComputeHistoThread(DHistogram [][] hcs, int colFrom, int colTo, int maxChunkSz, boolean sharedHisto){
       _lhcs = hcs; _colFrom = colFrom; _colTo = colTo; _maxChunkSz = maxChunkSz;
+      _shareHisto = sharedHisto;
     }
 
     @Override
@@ -232,7 +244,7 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
       for(DHistogram[] dr:_lhcs)
         for(DHistogram d:dr)
           assert d == null || d._w == null;
-      ComputeHistoThread res = new ComputeHistoThread(_shareHisto? _lhcs :ArrayUtils.deepClone(_lhcs),_colFrom,_colTo,_maxChunkSz);
+      ComputeHistoThread res = new ComputeHistoThread(_shareHisto? _lhcs :ArrayUtils.deepClone(_lhcs),_colFrom,_colTo,_maxChunkSz,_shareHisto);
       return res;
     }
 

@@ -156,6 +156,12 @@ public class GBM extends SharedTree<GBMModel,GBMModel.GBMParameters,GBMModel.GBM
   private class GBMDriver extends Driver {
     @Override protected boolean doOOBScoring() { return false; }
     @Override protected void initializeModelSpecifics() {
+      if(_parms._use_new_histo_tsk){
+        _scbParms = new ScoreBuildHistogram2.SCBParms();
+        _scbParms.blockSz = _parms._col_block_sz;
+        _scbParms.sharedHisto = _parms._shared_histo;
+        _scbParms.min_threads = _parms._min_threads == -1?H2O.NUMCPUS:_parms._min_threads;
+      }
       _mtry_per_tree = Math.max(1, (int)(_parms._col_sample_rate_per_tree * _ncols)); //per-tree
       if (!(1 <= _mtry_per_tree && _mtry_per_tree <= _ncols)) throw new IllegalArgumentException("Computed mtry_per_tree should be in interval <1,"+_ncols+"> but it is " + _mtry_per_tree);
       _mtry = Math.max(1, (int)(_parms._col_sample_rate * _parms._col_sample_rate_per_tree * _ncols)); //per-split
@@ -416,6 +422,7 @@ public class GBM extends SharedTree<GBMModel,GBMModel.GBMParameters,GBMModel.GBM
         }
       }
     }
+    ScoreBuildHistogram2.SCBParms _scbParms;
 
     // --------------------------------------------------------------------------
     // Build the next k-trees, which is trying to correct the residual error from
@@ -551,7 +558,7 @@ public class GBM extends SharedTree<GBMModel,GBMModel.GBMParameters,GBMModel.GBM
       // Adds a layer to the trees each pass.
       int depth = 0;
       for (; depth < _parms._max_depth; depth++) {
-        hcs = buildLayer(_train, _parms._nbins, _parms._nbins_cats, ktrees, leaves, hcs, _parms._build_tree_one_node);
+        hcs = buildLayer(_train, _parms._nbins, _parms._nbins_cats, ktrees, leaves, hcs, _parms._build_tree_one_node,_scbParms);
         // If we did not make any new splits, then the tree is split-to-death
         if (hcs == null) break;
       }
