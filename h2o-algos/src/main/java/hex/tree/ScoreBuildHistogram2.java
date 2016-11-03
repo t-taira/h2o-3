@@ -118,6 +118,21 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
     })).join();
     int ncores = H2O.NUMCPUS;
 
+    if(_parms.sharedHisto){
+      for (int l = _leaf; l < _tree._len; l++) {
+        DTree.UndecidedNode udn = _tree.undecided(l);
+        DHistogram hs[] = _hcs[l - _leaf];
+        int sCols[] = udn._scoreCols;
+        if (sCols != null) { // Sub-selecting just some columns?
+          for (int col : sCols) // For tracked cols
+            hs[col].init();
+        } else {                 // Else all columns
+          for (int j = 0; j < hs.length; j++) // For all columns
+            if (hs[j] != null)        // Tracking this column?
+              hs[j].init();
+        }
+      }
+    }
     long [] espc = _fr2.anyVec().espc();
     int largestChunkSz = 0;
     for(int i = 1; i < espc.length; ++i){
@@ -243,7 +258,7 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
     public ComputeHistoThread makeCopy() {
       for(DHistogram[] dr:_lhcs)
         for(DHistogram d:dr)
-          assert d == null || d._w == null;
+          assert _shareHisto ||  d == null || d._w == null;
       ComputeHistoThread res = new ComputeHistoThread(_shareHisto? _lhcs :ArrayUtils.deepClone(_lhcs),_colFrom,_colTo,_maxChunkSz,_shareHisto);
       return res;
     }
@@ -253,17 +268,19 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
       ys = MemoryManager.malloc8d(_maxChunkSz);
       ws = MemoryManager.malloc8d(_maxChunkSz);
       // start computing
-      for( int l=_leaf; l<_tree._len; l++ ) {
-        DTree.UndecidedNode udn = _tree.undecided(l);
-        DHistogram hs[] = _lhcs[l-_leaf];
-        int sCols[] = udn._scoreCols;
-        if( sCols != null ) { // Sub-selecting just some columns?
-          for( int col : sCols ) // For tracked cols
-            if(_colFrom <= col && col < _colTo) hs[col-_colFrom].init();
-        } else {                 // Else all columns
-          for( int j=0; j<hs.length; j++) // For all columns
-            if( hs[j] != null )        // Tracking this column?
-              hs[j].init();
+      if(!_shareHisto) {
+        for (int l = _leaf; l < _tree._len; l++) {
+          DTree.UndecidedNode udn = _tree.undecided(l);
+          DHistogram hs[] = _lhcs[l - _leaf];
+          int sCols[] = udn._scoreCols;
+          if (sCols != null) { // Sub-selecting just some columns?
+            for (int col : sCols) // For tracked cols
+              if (_colFrom <= col && col < _colTo) hs[col - _colFrom].init();
+          } else {                 // Else all columns
+            for (int j = 0; j < hs.length; j++) // For all columns
+              if (hs[j] != null)        // Tracking this column?
+                hs[j].init();
+          }
         }
       }
     }
