@@ -156,8 +156,6 @@ public enum GlrmLoss {
     @Override public boolean isForBinary() { return false; }
 
     @Override public double mloss(double[] u, int a) {
-      if (!(a >= 0 && a < u.length))
-        throw new IndexOutOfBoundsException("a must be between 0 and " + (u.length - 1));
       return mloss(u, a, u.length);
     }
     // this function performs the same function as the one above but it is memory optimized for the original
@@ -166,20 +164,17 @@ public enum GlrmLoss {
       if (!(a >= 0 && a < u_len))
         throw new IndexOutOfBoundsException("a must be between 0 and " + (u_len - 1));
       double sum = 0;
-//      for (double ui : u)
       for (int ind=0; ind < u_len; ind++)
         sum += Math.max(1 + u[ind], 0);
       sum += Math.max(1 - u[a], 0) - Math.max(1 + u[a], 0);
       return sum;
     }
     @Override public double[] mlgrad(double[] u, int a) {
-      if (!(a >= 0 && a < u.length)) throw new IndexOutOfBoundsException("a must be between 0 and " + (u.length - 1));
       double[] grad = new double[u.length];
       return mlgrad(u, a, grad, u.length);
     }
     @Override public double[] mlgrad(double[] u, int a, double[] grad, int u_len) {
       if (!(a >= 0 && a < u_len)) throw new IndexOutOfBoundsException("a must be between 0 and " + (u_len - 1));
-//      double[] grad = new double[u_len];
       for (int i = 0; i < u_len; i++)
         grad[i] = (1 + u[i] > 0) ? 1 : 0;
       grad[a] = (1 - u[a] > 0) ? -1 : 0;
@@ -218,7 +213,6 @@ public enum GlrmLoss {
     }
     @Override public double[] mlgrad(double[] u, int a, double[] grad, int u_len) {
       if (!(a >= 0 && a < u_len)) throw new IndexOutOfBoundsException("a must be between 0 and " + (u_len - 1));
- //     double[] grad = new double[u_len];
       for (int i = 0; i < u_len - 1; i++)
         grad[i] = (a > i && 1 - u[i] > 0) ? -1 : 0;
       return grad;
