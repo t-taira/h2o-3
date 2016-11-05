@@ -574,7 +574,7 @@ public class VecUtils {
     }
   }
   public static int [] getLocalChunkIds(Vec v){
-    Key k = v._key;
+    Key k = Key.make(v._key._kb.clone());
     int [] res = new int[Math.max(v.nChunks()/H2O.CLOUD.size(),1)];
     int j = 0;
     for(int i = 0; i < v.nChunks(); ++i){
