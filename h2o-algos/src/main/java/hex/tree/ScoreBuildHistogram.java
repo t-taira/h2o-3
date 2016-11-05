@@ -152,6 +152,7 @@ public class ScoreBuildHistogram extends MRTask<ScoreBuildHistogram> {
   // criteria, and assigning the row to a new child UndecidedNode (and
   // giving it an improved prediction).
   protected void score_decide(Chunk chks[], Chunk nids, int nnids[]) {
+    double [] split_col = MemoryManager.malloc8d(chks[0]._len);
     for( int row=0; row<nids._len; row++ ) { // Over all rows
       int nid = (int)nids.at8(row);          // Get Node to decide from
       if( isDecidedRow(nid)) {               // already done
@@ -170,9 +171,9 @@ public class ScoreBuildHistogram extends MRTask<ScoreBuildHistogram> {
         nnids[row] = xnid-_leaf;
         dn = _tree.decided(nid); // Parent steers us
       }
-
+      chks[dn._split._col].getDoubles(split_col,0,split_col.length);
       assert !isDecidedRow(nid);
-      nid = dn.getChildNodeID(chks,row); // Move down the tree 1 level
+      nid = dn.getChildNodeID(split_col[row]); // Move down the tree 1 level
       if( !isDecidedRow(nid) ) {
         if( oob ) nid = nid2Oob(nid); // Re-apply OOB encoding
         nids.set(row, nid);
