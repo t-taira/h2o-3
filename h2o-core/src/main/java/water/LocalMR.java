@@ -34,8 +34,6 @@ public class LocalMR<T extends MrFun<T>> extends H2O.H2OCountedCompleter<LocalMR
   volatile Throwable _t;
   protected volatile boolean  _cancelled;
   private LocalMR<T> _root;
-  AtomicInteger _tcnt = new AtomicInteger();
-
 
   public LocalMR(MrFun mrt){this(mrt,H2O.NUMCPUS);}
   public LocalMR(MrFun mrt, int nthreads){this(mrt,nthreads,null);}
@@ -56,7 +54,6 @@ public class LocalMR<T extends MrFun<T>> extends H2O.H2OCountedCompleter<LocalMR
     _mrFun = src._mrFun.makeCopy();
     _lo = lo;
     _hi = hi;
-    _tcnt = src._tcnt;
     _cancelled = src._cancelled;
   }
 
@@ -70,7 +67,6 @@ public class LocalMR<T extends MrFun<T>> extends H2O.H2OCountedCompleter<LocalMR
   private int mid(){ return _lo + ((_hi - _lo) >> 1);}
   @Override
   public final void compute2() {
-    _tcnt.incrementAndGet();
     if (!_root._cancelled) {
       try {
         int mid = mid();
@@ -105,7 +101,6 @@ public class LocalMR<T extends MrFun<T>> extends H2O.H2OCountedCompleter<LocalMR
     }
     if(_root._cancelled) return;
     assert cc == this || cc == _left || cc == _rite;
-    assert (this != _root) || _tcnt.get() == _hi : "hi = " + _hi + ", tcnt = " + _tcnt.get();
     if (_left != null) {
       assert _left.completed;
       _mrFun.reduce(_left._mrFun);
