@@ -873,7 +873,7 @@ public class GBM extends SharedTree<GBMModel,GBMModel.GBMParameters,GBMModel.GBM
             DecidedNode dn = tree.decided(nid);           // Must have a decision point
             if( dn._split == null )                    // Unable to decide?
               dn = tree.decided(dn.pid());  // Then take parent's decision
-            int leafnid = dn.getChildNodeID(chks[dn._split._col].atd(row)); // Decide down to a leafnode
+            int leafnid = dn.getChildNodeID(chks,row); // Decide down to a leafnode
             assert leaf <= leafnid && leafnid < tree._len :
                     "leaf: " + leaf + " leafnid: " + leafnid + " tree._len: " + tree._len + "\ndn: " + dn;
             assert tree.node(leafnid) instanceof LeafNode;

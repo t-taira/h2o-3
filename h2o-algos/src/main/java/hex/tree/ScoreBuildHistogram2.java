@@ -95,20 +95,22 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
             if( isDecidedRow((int)nids.atd(row)) )
               nnids[row] = DECIDED_ROW;
           }
-        // Pass 2: accumulate all rows, cols into histograms
-        // Sort the rows by NID, so we visit all the same NIDs in a row
-        // Find the count of unique NIDs in this chunk
-        int nh[] = (_nhs[id] = new int[_hcs.length+1]);
-        for( int i : nnids )
-          if( i >= 0 )
-            nh[i+1]++;
-        // Rollup the histogram of rows-per-NID in this chunk
-        for( int i=0; i<_hcs.length; i++ ) nh[i+1] += nh[i];
-        // Splat the rows into NID-groups
-        int rows[] = (_rss[id] = new int[nnids.length]);
-        for (int row = 0; row < nnids.length; row++)
-          if (nnids[row] >= 0)
-            rows[nh[nnids[row]]++] = row;
+        if(!_parms._unordered) {
+          // Pass 2: accumulate all rows, cols into histograms
+          // Sort the rows by NID, so we visit all the same NIDs in a row
+          // Find the count of unique NIDs in this chunk
+          int nh[] = (_nhs[id] = new int[_hcs.length + 1]);
+          for (int i : nnids)
+            if (i >= 0)
+              nh[i + 1]++;
+          // Rollup the histogram of rows-per-NID in this chunk
+          for (int i = 0; i < _hcs.length; i++) nh[i + 1] += nh[i];
+          // Splat the rows into NID-groups
+          int rows[] = (_rss[id] = new int[nnids.length]);
+          for (int row = 0; row < nnids.length; row++)
+            if (nnids[row] >= 0)
+              rows[nh[nnids[row]]++] = row;
+        }
         // rows[] has Chunk-local ROW-numbers now, in-order, grouped by NID.
         // nh[] lists the start of each new NID, and is indexed by NID+1.
       }
@@ -270,7 +272,7 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
       for (int c = _colFrom; c < _colTo; c++) {
         if(_unordered){
           _fr2.vec(c).chunkForChunkIdx(cidx).getDoubles(cs, 0, len);
-          updateHistoUnordered(_hcs[c],len,ws,cs,ys,nnids);
+          updateHistoUnordered(_lhcs[c-_colFrom],len,ws,cs,ys,nnids);
         } else {
           boolean extracted = false;
           for (int n = 0; n < hcslen; n++) {
