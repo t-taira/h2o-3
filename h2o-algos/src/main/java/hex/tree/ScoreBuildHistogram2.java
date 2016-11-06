@@ -3,7 +3,6 @@ package hex.tree;
 import hex.genmodel.utils.DistributionFamily;
 import jsr166y.CountedCompleter;
 import jsr166y.ForkJoinTask;
-import sun.util.resources.uk.CalendarData_uk;
 import water.*;
 import water.fvec.C0DChunk;
 import water.fvec.Chunk;
@@ -13,6 +12,7 @@ import water.util.ArrayUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
+
 import water.fvec.Vec;
 import water.util.Log;
 import water.util.VecUtils;
@@ -73,14 +73,12 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
     _rss = new int[_cids.length][];
     if(_parms._unordered)
       _nnids = new int[_cids.length][];
-
-    H2O.submitTask(new LocalMR(new MRT(){
+    final AtomicInteger cidx = new AtomicInteger(0);
+    H2O.submitTask(new LocalMR(new MrFun(){
       // more or less copied from ScoreBuildHistogram
       private void map(int id, Chunk [] chks) {
-        final Chunk wrks = chks[_workIdx];
         final Chunk nids = chks[_nidIdx];
         final Chunk weight = _weightIdx>=0 ? chks[_weightIdx] : new C0DChunk(1, chks[0].len());
-
         // Pass 1: Score a prior partially-built tree model, and make new Node
         // assignments to every row.  This involves pulling out the current
         // assigned DecidedNode, "scoring" the row against that Node's decision
@@ -107,29 +105,25 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
         // Rollup the histogram of rows-per-NID in this chunk
         for( int i=0; i<_hcs.length; i++ ) nh[i+1] += nh[i];
         // Splat the rows into NID-groups
-        if(_parms._unordered){
-          for(int i = 0; i < nnids.length; ++i)
-            nnids[i] -= _leaf;
-        } else {
-          int rows[] = (_rss[id] = new int[nnids.length]);
-          for (int row = 0; row < nnids.length; row++)
-            if (nnids[row] >= 0)
-              rows[nh[nnids[row]]++] = row;
-        }
+        int rows[] = (_rss[id] = new int[nnids.length]);
+        for (int row = 0; row < nnids.length; row++)
+          if (nnids[row] >= 0)
+            rows[nh[nnids[row]]++] = row;
         // rows[] has Chunk-local ROW-numbers now, in-order, grouped by NID.
         // nh[] lists the start of each new NID, and is indexed by NID+1.
       }
       @Override
-      void map(int id) {
-        Chunk [] chks = new Chunk[_fr2.numCols()];
-        Vec [] vecs = _fr2.vecs();
-        for(int i = 0; i < chks.length; ++i)
-          chks[i] = vecs[i].chunkForChunkIdx(_cids[id]);
-        map(id,chks);
+      protected void map(int id) {
+        Chunk[] chks = new Chunk[_fr2.numCols()];
+        Vec[] vecs = _fr2.vecs();
+        for(id = cidx.getAndIncrement(); id < _cids.length; id = cidx.getAndIncrement()) {
+          int cidx = _cids[id];
+          for (int i = 0; i < chks.length; ++i)
+            chks[i] = vecs[i].chunkForChunkIdx(cidx);
+          map(id,chks);
+        }
       }
     })).join();
-    int ncores = H2O.NUMCPUS;
-
     if(_parms.sharedHisto){
       for (int l = _leaf; l < _tree._len; l++) {
         DTree.UndecidedNode udn = _tree.undecided(l);
@@ -167,7 +161,7 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
       DHistogram[][] hcs = _hcs.clone();
       for(int j = 0; j < hcs.length; ++j)
         hcs[j] = Arrays.copyOfRange(hcs[j],colFrom,colTo);
-      tsks.add(new LocalMR<ComputeHistoThread>(new ComputeHistoThread(hcs,colFrom,colTo,largestChunkSz,_parms.sharedHisto,_parms._unordered),priority(),nthreads));
+      tsks.add(new LocalMR<ComputeHistoThread>(new ComputeHistoThread(hcs,colFrom,colTo,largestChunkSz,_parms.sharedHisto,_parms._unordered, new AtomicInteger()), nthreads, priority()));
     }
     ForkJoinTask.invokeAll(tsks);
   }
@@ -186,72 +180,7 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
     }
   }
 
-  public static abstract class MRT<T extends MRT<T>> extends Iced<T> {
-    void init(){}
-    abstract void map(int id);
-    void reduce(T t){}
-    public MRT<T> makeCopy(){return clone();}
-  }
-  private class LocalMR<T extends MRT> extends H2O.H2OCountedCompleter<LocalMR> {
-    int _lo;
-    int _hi;
-    boolean _top = true;
-    final MRT _mrt;
-
-    AtomicInteger _cidx = new AtomicInteger();
-    AtomicInteger _tcnt = new AtomicInteger();
-
-
-
-    public LocalMR(MRT mrt, byte priority, int nthreads) { super(priority); _mrt = mrt; _lo = 0; _hi = nthreads;}
-    public LocalMR(MRT mrt, byte priority ) { this(mrt,priority,H2O.NUMCPUS);}
-    public LocalMR(MRT mrt) { _mrt = mrt; _lo = 0; _hi = H2O.NUMCPUS;}
-    public LocalMR(LocalMR src, int lo, int hi) {
-      super(src);
-      _mrt = src._mrt.makeCopy();
-      _lo = lo;
-      _hi = hi;
-      _cidx = src._cidx;
-      _tcnt = src._tcnt;
-      _top = false;
-    }
-
-    private LocalMR<T> _left;
-    private LocalMR<T> _rite;
-
-    volatile boolean completed;
-
-    @Override
-    public final void compute2() {
-      _tcnt.incrementAndGet();
-      if (_hi - _lo >= 2) {
-        int mid = _lo + ((_hi - _lo) >> 1);
-        addToPendingCount(1);
-        H2O.submitTask(_left = new LocalMR(this,_lo,mid));
-        if ((mid + 1) < _hi) {
-          addToPendingCount(1);
-          H2O.submitTask(_rite = new LocalMR(this,mid+1,_hi));
-        }
-      }
-      if(_hi > _lo) {
-        _mrt.init();
-        for (int i = _cidx.getAndIncrement(); i < _cids.length; i = _cidx.getAndIncrement())
-          _mrt.map(i);
-      } else throw new RuntimeException("should not get here, lo = " + _lo + ", hi = " + _hi);
-      completed = true;
-      tryComplete();
-    }
-
-    @Override
-    public final void onCompletion(CountedCompleter cc) {
-      assert cc == this || cc == _left || cc == _rite;
-      assert !_top || _tcnt.get() == _hi:"hi = " + _hi + ", tcnt = " + _tcnt.get();
-      if(_left != null) { assert _left.completed; _mrt.reduce(_left._mrt); _left = null;}
-      if(_rite != null) { assert _rite.completed; _mrt.reduce(_rite._mrt); _rite = null;}
-    }
-  }
-
-  private class ComputeHistoThread extends MRT<ComputeHistoThread> {
+  private class ComputeHistoThread extends MrFun<ComputeHistoThread> {
     final int _maxChunkSz;
     final int _colFrom, _colTo;
     boolean _shareHisto = false;
@@ -261,11 +190,13 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
     double [] cs = null;
     double [] ws = null;
     double [] ys = null;
+    AtomicInteger _cidx;
 
-    ComputeHistoThread(DHistogram [][] hcs, int colFrom, int colTo, int maxChunkSz, boolean sharedHisto, boolean unordered){
+    ComputeHistoThread(DHistogram [][] hcs, int colFrom, int colTo, int maxChunkSz, boolean sharedHisto, boolean unordered, AtomicInteger cidx){
       _lhcs = hcs; _colFrom = colFrom; _colTo = colTo; _maxChunkSz = maxChunkSz;
       _shareHisto = sharedHisto;
       _unordered = unordered;
+      _cidx = cidx;
     }
 
     @Override
@@ -273,11 +204,13 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
       for(DHistogram[] dr:_lhcs)
         for(DHistogram d:dr)
           assert _shareHisto ||  d == null || d._w == null;
-      ComputeHistoThread res = new ComputeHistoThread(_shareHisto? _lhcs :ArrayUtils.deepClone(_lhcs),_colFrom,_colTo,_maxChunkSz,_shareHisto,_unordered);
+      ComputeHistoThread res = new ComputeHistoThread(_shareHisto? _lhcs :ArrayUtils.deepClone(_lhcs),_colFrom,_colTo,_maxChunkSz,_shareHisto,_unordered,_cidx);
       return res;
     }
 
-    void init(){
+
+    @Override
+    protected void map(int id){
       cs = MemoryManager.malloc8d(_maxChunkSz);
       ys = MemoryManager.malloc8d(_maxChunkSz);
       ws = MemoryManager.malloc8d(_maxChunkSz);
@@ -297,10 +230,11 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
           }
         }
       }
+      for(int i = _cidx.getAndIncrement(); i < _cids.length; i = _cidx.getAndIncrement())
+        computeChunk(i);
     }
 
-    @Override
-    public void map(int id){
+    private void computeChunk(int id){
       ScoreBuildHistogram.LocalHisto lh = _shareHisto?new ScoreBuildHistogram.LocalHisto(Math.max(_nbins,_nbins_cats)):null;
       int cidx = _cids[id];
       int [] nh = _nhs[id];
@@ -339,11 +273,77 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
     }
 
     @Override
-    public void reduce(ComputeHistoThread cc) {
+    protected void reduce(ComputeHistoThread cc) {
       if(!_shareHisto) {
         assert _lhcs != cc._lhcs;
         mergeHistos(_lhcs, cc._lhcs);
       } else assert _lhcs == cc._lhcs;
     }
   }
+
+  public static abstract class MRT<T extends MRT<T>> extends Iced<T> {
+    void init(){}
+    abstract void map(int id);
+    void reduce(T t){}
+    public MRT<T> makeCopy(){return clone();}
+  }
+
+  private class LocalMR2<T extends MRT> extends H2O.H2OCountedCompleter<LocalMR> {
+    int _lo;
+    int _hi;
+    boolean _top = true;
+    final MRT _mrt;
+
+    AtomicInteger _cidx = new AtomicInteger();
+    AtomicInteger _tcnt = new AtomicInteger();
+
+
+    public LocalMR2(MRT mrt, byte priority, int nthreads) { super(priority); _mrt = mrt; _lo = 0; _hi = nthreads;}
+    public LocalMR2(MRT mrt, byte priority ) { this(mrt,priority,H2O.NUMCPUS);}
+    public LocalMR2(MRT mrt) { _mrt = mrt; _lo = 0; _hi = H2O.NUMCPUS;}
+    public LocalMR2(LocalMR2 src, int lo, int hi) {
+      super(src);
+      _mrt = src._mrt.makeCopy();
+      _lo = lo;
+      _hi = hi;
+      _cidx = src._cidx;
+      _tcnt = src._tcnt;
+      _top = false;
+    }
+
+    private LocalMR2<T> _left;
+    private LocalMR2<T> _rite;
+
+    volatile boolean completed;
+
+    @Override
+    public final void compute2() {
+      _tcnt.incrementAndGet();
+      if (_hi - _lo >= 2) {
+        int mid = _lo + ((_hi - _lo) >> 1);
+        addToPendingCount(1);
+        H2O.submitTask(_left = new LocalMR2(this,_lo,mid));
+        if ((mid + 1) < _hi) {
+          addToPendingCount(1);
+          H2O.submitTask(_rite = new LocalMR2(this,mid+1,_hi));
+        }
+      }
+      if(_hi > _lo) {
+        _mrt.init();
+        for (int i = _cidx.getAndIncrement(); i < _cids.length; i = _cidx.getAndIncrement())
+          _mrt.map(i);
+      } else throw new RuntimeException("should not get here, lo = " + _lo + ", hi = " + _hi);
+      completed = true;
+      tryComplete();
+    }
+
+    @Override
+    public final void onCompletion(CountedCompleter cc) {
+      assert cc == this || cc == _left || cc == _rite;
+      assert !_top || _tcnt.get() == _hi:"hi = " + _hi + ", tcnt = " + _tcnt.get();
+      if(_left != null) { assert _left.completed; _mrt.reduce(_left._mrt); _left = null;}
+      if(_rite != null) { assert _rite.completed; _mrt.reduce(_rite._mrt); _rite = null;}
+    }
+  }
+
 }
