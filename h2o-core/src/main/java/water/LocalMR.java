@@ -39,6 +39,7 @@ public class LocalMR<T extends MrFun<T>> extends H2O.H2OCountedCompleter<LocalMR
   public LocalMR(MrFun mrt, int nthreads){this(mrt,nthreads,null);}
   public LocalMR(MrFun mrt, H2O.H2OCountedCompleter cc){this(mrt,H2O.NUMCPUS,cc,(byte)(H2O.H2OCallback.currThrPriority()+1));}
   public LocalMR(MrFun mrt, int nthreads, H2O.H2OCountedCompleter cc){this(mrt,nthreads,cc,(byte)(H2O.H2OCallback.currThrPriority()+1));}
+  public LocalMR(MrFun mrt, int nthreads, byte priority) {this(mrt,nthreads,null,priority);}
   public LocalMR(MrFun mrt, int nthreads, H2O.H2OCountedCompleter cc, byte priority) {
     super(cc,priority);
     if(nthreads <= 0) throw new IllegalArgumentException("nthreads must be positive");
