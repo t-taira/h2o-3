@@ -90,12 +90,22 @@ public class LocalMRTest extends TestUtil {
   public void testThrow() {
     long seed = 87654321;
     Random rnd = new Random(seed);
-    for(int k = 0; k < 50; ++k){
-      int cnt = rnd.nextInt(1000);
+    for(int k = 0; k < 10; ++k){
+      int cnt = Math.max(1,rnd.nextInt(50));
       final int exId = Math.max(1,rnd.nextInt(cnt));
       final AtomicInteger active = new AtomicInteger();
+      // test correct throw behavior with blocking call
       try {
-        H2O.submitTask(new LocalMR(new MrFunTest2(exId,active))).join();
+        H2O.submitTask(new LocalMR(new MrFunTest2(exId,active),cnt)).join();
+        assertTrue("should've thrown test exception",false);
+      } catch(TestException t) {
+        assertEquals(0,active.get());
+      }
+      // and with completer
+      try {
+        H2O.H2OCountedCompleter cc = new H2O.H2OCountedCompleter(){};
+        H2O.submitTask(new LocalMR(new MrFunTest2(exId,active),cnt,cc));
+        cc.join();
         assertTrue("should've thrown test exception",false);
       } catch(TestException t) {
         assertEquals(0,active.get());
