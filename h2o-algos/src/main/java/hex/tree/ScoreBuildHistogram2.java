@@ -50,7 +50,7 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
   SCBParms _parms;
 
   public ScoreBuildHistogram2(H2O.H2OCountedCompleter cc, int k, int ncols, int nbins, int nbins_cats, DTree tree, int leaf, DHistogram[][] hcs, DistributionFamily family, int weightIdx, int workIdx, int nidIdx, SCBParms parms) {
-    super(cc, k, ncols, nbins, nbins_cats, tree, leaf, hcs, family, weightIdx, workIdx, nidIdx);
+    super(cc, k, ncols, nbins, nbins_cats, tree, leaf, parms._unordered?ArrayUtils.transpose(hcs):hcs, family, weightIdx, workIdx, nidIdx);
     _parms = parms;
   }
 
@@ -158,9 +158,9 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
     for(int i = 0; i < ncols; i += colBlockSz){
       final int colFrom= i;
       final int colTo = Math.min(ncols,colFrom+colBlockSz);
-      DHistogram[][] hcs = _hcs.clone();
+      DHistogram[][] hcs = _parms._unordered?Arrays.copyOfRange(_hcs,colFrom,colTo):_hcs.clone(); // TODO not sure I need to clone
       for(int j = 0; j < hcs.length; ++j)
-        hcs[j] = Arrays.copyOfRange(hcs[j],colFrom,colTo);
+        hcs[j] = _parms._unordered?hcs[j].clone():Arrays.copyOfRange(hcs[j],colFrom,colTo);
       tsks.add(new LocalMR<ComputeHistoThread>(new ComputeHistoThread(hcs,colFrom,colTo,largestChunkSz,_parms.sharedHisto,_parms._unordered, new AtomicInteger()), nthreads, priority()));
     }
     ForkJoinTask.invokeAll(tsks);
@@ -215,7 +215,11 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
       ys = MemoryManager.malloc8d(_maxChunkSz);
       ws = MemoryManager.malloc8d(_maxChunkSz);
       // start computing
-      if(!_shareHisto) {
+      if(_unordered) {
+        for(DHistogram [] dhary:_lhcs)
+          for(DHistogram dh:dhary)
+            if(dh != null) dh.init();
+      } else if(!_shareHisto) {
         for (int l = _leaf; l < _tree._len; l++) {
           DTree.UndecidedNode udn = _tree.undecided(l);
           DHistogram hs[] = _lhcs[l - _leaf];
@@ -234,6 +238,21 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
         computeChunk(i);
     }
 
+    public void updateHistoUnordered(DHistogram[] hcs, int len, double[] ws, double[] cs, double[] ys, int [] nids){
+//      double minmax[] = new double[]{_min2,_maxIn};
+      // Gather all the data for this set of rows, for 1 column and 1 split/NID
+      // Gather min/max, wY and sum-squares.
+      for(int r = 0; r< len; ++r) {
+        double w = ws[r];
+        if (w == 0) continue;
+        int nid = nids[r];
+        if(nid < 0) continue; // decided row?
+        DHistogram dh = hcs[nid];
+        if(dh == null) continue;
+        dh.updateHisto(w, cs[r], ys[r]);
+      }
+    }
+
     private void computeChunk(int id){
       ScoreBuildHistogram.LocalHisto lh = _shareHisto?new ScoreBuildHistogram.LocalHisto(Math.max(_nbins,_nbins_cats)):null;
       int cidx = _cids[id];
@@ -250,7 +269,8 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
       final int hcslen = _lhcs.length;
       for (int c = _colFrom; c < _colTo; c++) {
         if(_unordered){
-          throw H2O.unimpl();
+          _fr2.vec(c).chunkForChunkIdx(cidx).getDoubles(cs, 0, len);
+          updateHistoUnordered(_hcs[c],len,ws,cs,ys,nnids);
         } else {
           boolean extracted = false;
           for (int n = 0; n < hcslen; n++) {
@@ -279,5 +299,8 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
         mergeHistos(_lhcs, cc._lhcs);
       } else assert _lhcs == cc._lhcs;
     }
+  }
+  @Override public void postGlobal(){
+    if(_parms._unordered) _hcs = ArrayUtils.transpose(_hcs);
   }
 }

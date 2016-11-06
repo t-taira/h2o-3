@@ -12,7 +12,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Tasks are launched via H2O.submit task rather than fork (assuming different usage pattern than MRT - use fewer longer running tasks -> push into global FJQ).
  *
  * User provides a MrFun function object with map/reduce/makeCopy functions.
- * LocalMR will arrange MrFun objects (replicated by calling makeCopy call) into a tree and call map(index fo the task on each) and parent.reduce(child) for each paranet-child pair in the tree.
  *
  * Here is a sample tree and reduce pairs for LocalMR creating 8 tasks
  *          4
@@ -28,8 +27,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  */
 public class LocalMR<T extends MrFun<T>> extends H2O.H2OCountedCompleter<LocalMR> {
-  int _lo;
-  int _hi;
+  private int _lo;
+  private int _hi;
   final MrFun _mrFun;
   volatile Throwable _t;
   protected volatile boolean  _cancelled;
@@ -66,6 +65,7 @@ public class LocalMR<T extends MrFun<T>> extends H2O.H2OCountedCompleter<LocalMR
   public boolean isCancelRequested(){return _root._cancelled;}
 
   private int mid(){ return _lo + ((_hi - _lo) >> 1);}
+
   @Override
   public final void compute2() {
     if (!_root._cancelled) {

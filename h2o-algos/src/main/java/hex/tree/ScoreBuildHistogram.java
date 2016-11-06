@@ -41,7 +41,7 @@ public class ScoreBuildHistogram extends MRTask<ScoreBuildHistogram> {
   final DTree _tree; // Read-only, shared (except at the histograms in the Nodes)
   final int   _leaf; // Number of active leaves (per tree)
   // Histograms for every tree, split & active column
-  final DHistogram _hcs[/*tree-relative node-id*/][/*column*/];
+  DHistogram _hcs[/*tree-relative node-id*/][/*column*/];
   final DistributionFamily _family;
   final int _weightIdx;
   final int _workIdx;

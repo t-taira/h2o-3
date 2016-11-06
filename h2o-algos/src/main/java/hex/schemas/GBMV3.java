@@ -63,7 +63,8 @@ public class GBMV3 extends SharedTreeV3<GBM,GBMV3,GBMV3.GBMParametersV3> {
       "use_new_histo_tsk",
       "col_block_sz",
       "min_threads",
-      "shared_histo"
+      "shared_histo",
+      "unordered"
     };
 
     // Input fields
@@ -91,5 +92,7 @@ public class GBMV3 extends SharedTreeV3<GBM,GBMV3,GBMV3.GBMParametersV3> {
     public int min_threads = -1;
     @API(help="Use with new histo task only! Share histo (and use CAS) instead of making private copies", level = API.Level.expert, gridable = false)
     public boolean shared_histo;
+    @API(help="Use with new histo task only! Access rows in order of the dataset, not in order of leafs ", level = API.Level.expert, gridable = false)
+    public boolean unordered;
   }
 }
