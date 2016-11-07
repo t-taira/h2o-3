@@ -177,8 +177,10 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
       else if( hs2 != null )
         for( int j=0; j<hs1.length; j++ )
           if( hs1[j] == null ) hs1[j] = hs2[j];
-          else if( hs2[j] != null )
+          else if( hs2[j] != null ) {
             hs1[j].add(hs2[j]);
+            hs1[j].reducePrecision();
+          }
     }
   }
 
@@ -253,6 +255,8 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
         if(dh == null) continue;
         dh.updateHisto(w, cs[r], ys[r]);
       }
+      for(DHistogram dh:hcs)
+        if(dh != null)dh.reducePrecision();;
     }
 
     private void computeChunk(int id){
@@ -273,6 +277,9 @@ public class ScoreBuildHistogram2 extends ScoreBuildHistogram {
         if(_unordered){
           _fr2.vec(c).chunkForChunkIdx(cidx).getDoubles(cs, 0, len);
           updateHistoUnordered(_lhcs[c-_colFrom],len,ws,cs,ys,nnids);
+          for(DHistogram[] dha:_lhcs)
+            for(DHistogram dh:dha)
+              if(dh != null) dh.reducePrecision();
         } else {
           boolean extracted = false;
           for (int n = 0; n < hcslen; n++) {

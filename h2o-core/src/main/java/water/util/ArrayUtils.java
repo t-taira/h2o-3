@@ -344,8 +344,10 @@ public class ArrayUtils {
     return res;
   }
 
+  public static <T> T[] cloneOrNull(T[] ary){return ary == null?null:ary.clone();}
+
   public static <T> T[][] transpose(T[][] ary) {
-    if(ary == null) return null;
+    if(ary == null|| ary.length == 0) return ary;
     T [][] res  = Arrays.copyOf(ary,ary[0].length);
     for(int i = 0; i < res.length; ++i)
       res[i] = Arrays.copyOf(ary[0],ary.length);

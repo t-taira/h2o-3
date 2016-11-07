@@ -72,16 +72,21 @@ public class LocalMR<T extends MrFun<T>> extends H2O.H2OCountedCompleter<LocalMR
       try {
         int mid = mid();
         assert _hi > _lo;
+        int pending = 0;
         if (_hi - _lo >= 2) {
-          addToPendingCount(1);
-          H2O.submitTask(_left = new LocalMR(this, _lo, mid));
+          _left = new LocalMR(this, _lo, mid);
+          pending++;
           if ((mid + 1) < _hi) {
-            addToPendingCount(1);
-            H2O.submitTask(_rite = new LocalMR(this, mid + 1, _hi));
+            _rite = new LocalMR(this, mid + 1, _hi);
+            pending++;
           }
+          addToPendingCount(pending);
+          H2O.submitTask(_left);
+          if(_rite != null) H2O.submitTask(_rite);
         }
         _mrFun.map(mid);
       } catch (Throwable t) {
+        t.printStackTrace();
         if (_root._t == null) {
           _root._t = t;
           _root._cancelled = true;
@@ -96,9 +101,8 @@ public class LocalMR<T extends MrFun<T>> extends H2O.H2OCountedCompleter<LocalMR
   public final void onCompletion(CountedCompleter cc) {
     if(_cancelled){
       assert this == _root;
-      CancellationException t = new CancellationException();
-      completeExceptionally(_t == null?t:_t); // instead of throw
-      throw t;
+      completeExceptionally(_t == null?new CancellationException():_t); // instead of throw
+      return;
     }
     if(_root._cancelled) return;
     assert cc == this || cc == _left || cc == _rite;

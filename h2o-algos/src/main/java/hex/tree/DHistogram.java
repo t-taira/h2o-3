@@ -671,13 +671,20 @@ public final class DHistogram extends Iced {
         _wYY[b] += wyy;
       }
     }
+    reducePrecision();
+    double d;
+    if( (d = minmax[0]) < _min2 )  _min2  = d;
+    if( (d = minmax[1]) > _maxIn)  _maxIn = d;
+  }
+
+  public void reducePrecision(){
+//    _naCnt._vals[1] = (float)_naCnt._vals[1];
+//    _naCnt._vals[2] = (float)_naCnt._vals[2];
+    if(_w == null)return;
     for(int i = 0; i < _wY.length; ++i){
       _wY[i] = (float)_wY[i];
       _wYY[i] = (float)_wYY[i];
     }
-    double d;
-    if( (d = minmax[0]) < _min2 )  _min2  = d;
-    if( (d = minmax[1]) > _maxIn)  _maxIn = d;
   }
 
   public void updateSharedHistosAndReset(ScoreBuildHistogram.LocalHisto lh, double[] ws, double[] cs, double[] ys, int [] rows, int hi, int lo) {
